@@ -1,0 +1,5 @@
+**/reversi-app/node_modules
+**/reversi-app/node_modules/**
+
+**/reversi-server/node_modules
+**/reversi-server/node_modules/**
