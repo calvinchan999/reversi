@@ -15,12 +15,18 @@ function App() {
   const [chatMessage, setChatMessage] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
   const [gameOver, setGameOver] = useState(false);
+  const [score, setScore] = useState({ whiteScore: 0, blackScore: 0 });
 
   const chatEndRef = useRef(null);
 
   useEffect(() => {
     socket.on("updateBoard", (newBoard) => {
       setBoard(newBoard);
+    });
+
+    socket.on("score", (score) => {
+      const { whiteCount, blackCount } = score;
+      setScore({ whiteScore: whiteCount, blackScore: blackCount });
     });
 
     socket.on("switchTurn", (player) => {
@@ -152,6 +158,9 @@ function App() {
             </div>
             <p>Current player: {currentPlayer}</p>
             <p>You are: {playerColor}</p>
+            <p>
+              White: {score.whiteScore} Black: {score.blackScore}{" "}
+            </p>
           </div>
           <div className="chat-container">
             <div className="chat-history">
@@ -162,7 +171,8 @@ function App() {
                     msg.player === playerColor ? "my-message" : "other-message"
                   }`}
                 >
-                  <span className="player-color">{msg.player}:</span>{" "}
+                  {/* <span className="player-id">{msg.socketId}</span><br/> */}
+                  <span className="player-color">{msg.player}:</span>
                   {msg.message}
                 </div>
               ))}
