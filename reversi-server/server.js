@@ -1,29 +1,46 @@
-// server.js
 const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
 const Redis = require("ioredis");
+const winston = require("winston");
+require("dotenv").config();
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: process.env.CLIENT_ORIGIN || "http://localhost:3000",
     methods: ["GET", "POST"],
   },
 });
 
-const { redisConfig } = require("./redisConfig")
+const { redisConfig } = require("./redisConfig");
 
 const redis = new Redis(redisConfig);
 const GAME_TTL = 3600;
+const BOARD_SIZE = 64;
+const INITIAL_BLACK_POSITIONS = [27, 36];
+const INITIAL_WHITE_POSITIONS = [28, 35];
 
-// const rooms = new Map();
+const logger = winston.createLogger({
+  level: "info",
+  format: winston.format.json(),
+  transports: [
+    new winston.transports.File({ filename: "error.log", level: "error" }),
+    new winston.transports.File({ filename: "combined.log" }),
+  ],
+});
+
+if (process.env.NODE_ENV !== "production") {
+  logger.add(new winston.transports.Console({
+    format: winston.format.simple(),
+  }));
+}
 
 function createGame() {
-  let board = Array(64).fill(null);
-  board[27] = board[36] = "white";
-  board[28] = board[35] = "black";
+  let board = Array(BOARD_SIZE).fill(null);
+  INITIAL_BLACK_POSITIONS.forEach(pos => board[pos] = "black");
+  INITIAL_WHITE_POSITIONS.forEach(pos => board[pos] = "white");
   return {
     board,
     currentPlayer: "black",
@@ -38,24 +55,21 @@ function isValidMove(board, player, index) {
 
   const opponent = player === "black" ? "white" : "black";
 
-  for (let direction of directions) {
+  return directions.some(direction => {
     let currentIndex = index + direction;
     let flipped = false;
 
-    while (currentIndex >= 0 && currentIndex < 64) {
+    while (isValidIndex(currentIndex)) {
       if (board[currentIndex] === null) break;
-      if (board[currentIndex] === player) {
-        if (flipped) return true;
-        break;
-      }
+      if (board[currentIndex] === player) return flipped;
       if (board[currentIndex] === opponent) {
         flipped = true;
         currentIndex += direction;
       }
     }
-  }
 
-  return false;
+    return false;
+  });
 }
 
 function getValidMoves(board, player) {
@@ -89,18 +103,20 @@ function makeMove(board, index, player) {
   if (!isValidMove(board, player, index)) return false;
 
   board[index] = player;
+
+  logger.info(board);
   const opponent = player === "black" ? "white" : "black";
 
-  for (let direction of directions) {
+  directions.forEach(direction => {
     let currentIndex = index + direction;
     let toFlip = [];
 
-    while (currentIndex >= 0 && currentIndex < 64) {
+    while (isValidIndex(currentIndex) && isInSameDirection(index, currentIndex, direction)) {
       if (board[currentIndex] === null) break;
       if (board[currentIndex] === player) {
-        for (let flipIndex of toFlip) {
+        toFlip.forEach(flipIndex => {
           board[flipIndex] = player;
-        }
+        });
         break;
       }
       if (board[currentIndex] === opponent) {
@@ -108,150 +124,223 @@ function makeMove(board, index, player) {
         currentIndex += direction;
       }
     }
-  }
+  });
 
   return true;
 }
 
+function isValidIndex(index) {
+  const row = Math.floor(index / 8);
+  const col = index % 8;
+  return row >= 0 && row < 8 && col >= 0 && col < 8;
+}
+
+function isInSameDirection(start, current, direction) {
+  const startRow = Math.floor(start / 8);
+  const startCol = start % 8;
+  const currentRow = Math.floor(current / 8);
+  const currentCol = current % 8;
+
+  switch (direction) {
+    case -9: case 7: return currentCol < startCol; // left diagonal
+    case -7: case 9: return currentCol > startCol; // right diagonal
+    case -8: case 8: return currentCol === startCol; // vertical
+    case -1: case 1: return currentRow === startRow; // horizontal
+    default: return false;
+  }
+}
+
 async function getGame(roomId) {
-  const gameString = await redis.get(`game:${roomId}`);
-  return gameString ? JSON.parse(gameString) : null;
+  try {
+    const gameString = await redis.get(`game:${roomId}`);
+    return gameString ? JSON.parse(gameString) : null;
+  } catch (error) {
+    logger.error(`Error getting game: ${error}`);
+    return null;
+  }
 }
 
 async function setGame(roomId, game) {
-  await redis.set(`game:${roomId}`, JSON.stringify(game));
+  try {
+    await redis.set(`game:${roomId}`, JSON.stringify(game), "EX", GAME_TTL);
+  } catch (error) {
+    logger.error(`Error setting game: ${error}`);
+  }
 }
 
 io.on("connection", (socket) => {
-  console.log("New client connected");
+  logger.info("New client connected");
 
-  socket.on("joinRoom", async (roomId) => {
-    console.log(`Player attempting to join room: ${roomId}`);
+  socket.on("joinRoom", async (roomId, mode) => {
+    logger.info(`Player attempting to join room: ${roomId} mode: ${mode}`);
 
-    let game = await getGame(roomId);
-    if (!game) {
-      console.log(`Creating new room: ${roomId}`);
-      game = createGame();
+    try {
+      let game = await getGame(roomId);
+      if (!game) {
+        logger.info(`Creating new room: ${roomId}`);
+        game = createGame();
+        game.mode = mode;
+        await setGame(roomId, game);
+      }
+
+      if (!game.players.black) {
+        game.players.black = socket.id;
+        socket.join(roomId);
+        socket.emit("playerColor", "black");
+        logger.info(`Player ${socket.id} joined room ${roomId} as black`);
+      } else if (!game.players.white) {
+        if (mode === "ai") {
+          game.players.white = "ai";
+          logger.info(`AI joined room ${roomId} as white`);
+        } else {
+          game.players.white = socket.id;
+          socket.join(roomId);
+          socket.emit("playerColor", "white");
+          logger.info(`Player ${socket.id} joined room ${roomId} as white`);
+        }
+      } else {
+        logger.info(`Room ${roomId} is full, rejecting player ${socket.id}`);
+        socket.emit("roomFull");
+        return;
+      }
+
       await setGame(roomId, game);
-    }
 
-    if (!game.players.black) {
-      game.players.black = socket.id;
-      socket.join(roomId);
-      socket.emit("playerColor", "black");
-      console.log(`Player ${socket.id} joined room ${roomId} as black`);
-    } else if (!game.players.white) {
-      game.players.white = socket.id;
-      socket.join(roomId);
-      socket.emit("playerColor", "white");
-      console.log(`Player ${socket.id} joined room ${roomId} as white`);
-    } else {
-      console.log(`Room ${roomId} is full, rejecting player ${socket.id}`);
-      socket.emit("roomFull");
-      return;
-    }
+      socket.emit("updateBoard", game.board);
+      socket.emit("switchTurn", game.currentPlayer);
 
-    await setGame(roomId, game);
-
-    socket.emit("updateBoard", game.board);
-    socket.emit("switchTurn", game.currentPlayer);
-
-    if (game.players.black && game.players.white) {
-      console.log(`Game in room ${roomId} is starting`);
-      io.to(roomId).emit("gameStart");
-    }
-
-    const blackCount = game.board.filter((cell) => cell === "black").length;
-    const whiteCount = game.board.filter((cell) => cell === "white").length;
-    io.to(roomId).emit("score", { blackCount, whiteCount });
-  });
-
-  socket.on("makeMove", async ({ index, player, roomId }) => {
-    // const game = rooms.get(roomId);
-    const game = await getGame(roomId);
-    if (
-      game &&
-      player === game.currentPlayer &&
-      makeMove(game.board, index, player)
-    ) {
-      io.to(roomId).emit("updateBoard", game.board);
+      if (game.players.black && game.players.white) {
+        logger.info(`Game in room ${roomId} is starting`);
+        io.to(roomId).emit("gameStart");
+        if (game.mode === "ai" && game.currentPlayer === "white") {
+          await handleAIMove(roomId);
+        }
+      }
 
       const blackCount = game.board.filter((cell) => cell === "black").length;
       const whiteCount = game.board.filter((cell) => cell === "white").length;
       io.to(roomId).emit("score", { blackCount, whiteCount });
+    } catch (error) {
+      logger.error(`Error in joinRoom: ${error}`);
+      socket.emit("error", "An error occurred while joining the room");
+    }
+  });
 
-      const winner = checkWinner(game.board);
-      if (winner) {
-        io.to(roomId).emit("gameOver", winner);
-      } else {
-        game.currentPlayer = game.currentPlayer === "black" ? "white" : "black";
-        const validMoves = getValidMoves(game.board, game.currentPlayer);
-        if (validMoves.length === 0) {
-          game.currentPlayer =
-            game.currentPlayer === "black" ? "white" : "black";
-          io.to(roomId).emit(
-            "skipTurn",
-            `${
-              game.currentPlayer === "black" ? "White" : "Black"
-            } has no valid moves. Skipping turn.`
-          );
+  async function handleAIMove(roomId) {
+    try {
+      const game = await getGame(roomId);
+      if (game && game.currentPlayer === "white" && game.players.white === "ai") {
+        const aiMove = getBotMove(game);
+        if (aiMove !== null) {
+          makeMove(game.board, aiMove, "white");
+          io.to(roomId).emit("updateBoard", game.board);
+
+          const winner = checkWinner(game.board);
+          if (winner) {
+            io.to(roomId).emit("gameOver", winner);
+          } else {
+            game.currentPlayer = "black";
+            const validMoves = getValidMoves(game.board, game.currentPlayer);
+            if (validMoves.length === 0) {
+              game.currentPlayer = "white";
+              io.to(roomId).emit(
+                "skipTurn",
+                "Black has no valid moves. Skipping turn."
+              );
+              await handleAIMove(roomId);
+            } else {
+              io.to(roomId).emit("switchTurn", game.currentPlayer);
+            }
+          }
+          await setGame(roomId, game);
         }
-        io.to(roomId).emit("switchTurn", game.currentPlayer);
       }
-      await setGame(roomId, game);
+    } catch (error) {
+      logger.error(`Error in handleAIMove: ${error}`);
+    }
+  }
+
+  socket.on("makeMove", async ({ index, player, roomId }) => {
+    try {
+      const game = await getGame(roomId);
+      if (
+        game &&
+        player === game.currentPlayer &&
+        makeMove(game.board, index, player)
+      ) {
+        io.to(roomId).emit("updateBoard", game.board);
+
+        const blackCount = game.board.filter((cell) => cell === "black").length;
+        const whiteCount = game.board.filter((cell) => cell === "white").length;
+        io.to(roomId).emit("score", { blackCount, whiteCount });
+
+        const winner = checkWinner(game.board);
+        if (winner) {
+          io.to(roomId).emit("gameOver", winner);
+        } else {
+          game.currentPlayer = game.currentPlayer === "black" ? "white" : "black";
+          const validMoves = getValidMoves(game.board, game.currentPlayer);
+          if (validMoves.length === 0) {
+            game.currentPlayer =
+              game.currentPlayer === "black" ? "white" : "black";
+            io.to(roomId).emit(
+              "skipTurn",
+              `${
+                game.currentPlayer === "black" ? "White" : "Black"
+              } has no valid moves. Skipping turn.`
+            );
+          }
+          io.to(roomId).emit("switchTurn", game.currentPlayer);
+        }
+        await setGame(roomId, game);
+
+        if (game.mode === "ai" && game.currentPlayer === "white") {
+          await handleAIMove(roomId);
+        }
+      }
+    } catch (error) {
+      logger.error(`Error in makeMove: ${error}`);
+      socket.emit("error", "An error occurred while making a move");
     }
   });
 
   socket.on("sendMessage", async ({ roomId, message, player }) => {
-    // const game = rooms.get(roomId);
-    const game = await getGame(roomId);
-    if (game && game?.players[player] === socket.id && message) {
-      io.to(roomId).emit("chatMessage", {
-        player,
-        message,
-        socketId: game.players[player],
-      });
+    try {
+      const game = await getGame(roomId);
+      if (game && game?.players[player] === socket.id && message) {
+        io.to(roomId).emit("chatMessage", {
+          player,
+          message,
+          socketId: game.players[player],
+        });
+      }
+    } catch (error) {
+      logger.error(`Error in sendMessage: ${error}`);
+      socket.emit("error", "An error occurred while sending a message");
     }
   });
 
-  // socket.on("score", ({roomId, player}) => {
-  //   const game = rooms.get(roomId);
-  //   if (game && game?.players[player] === socket.id) {
-
-  //   }
-  // })
-
-  // socket.on("disconnect", () => {
-  //   for (let [roomId, game] of rooms.entries()) {
-  //     if (
-  //       game.players.black === socket.id ||
-  //       game.players.white === socket.id
-  //     ) {
-  //       io.to(roomId).emit("playerDisconnected");
-  //       rooms.delete(roomId);
-  //       break;
-  //     }
-  //   }
-  //   console.log("Client disconnected");
-  // });
-
   socket.on("disconnect", async () => {
-    const rooms = await redis.keys("game:*");
-    for (let roomKey of rooms) {
-      const roomId = roomKey.split(":")[1];
-      const game = await getGame(roomId);
-      if (
-        game &&
-        (game.players.black === socket.id || game.players.white === socket.id)
-      ) {
-        io.to(roomId).emit("playerDisconnected");
-        await redis.del(`game:${roomId}`);
-        break;
+    try {
+      const rooms = await redis.keys("game:*");
+      for (let roomKey of rooms) {
+        const roomId = roomKey.split(":")[1];
+        const game = await getGame(roomId);
+        if (
+          game &&
+          (game.players.black === socket.id || game.players.white === socket.id)
+        ) {
+          io.to(roomId).emit("playerDisconnected");
+          await redis.del(`game:${roomId}`);
+          break;
+        }
       }
+      logger.info("Client disconnected");
+    } catch (error) {
+      logger.error(`Error in disconnect handler: ${error}`);
     }
-    console.log("Client disconnected");
   });
 });
 
-const port = 3001;
-server.listen(port, () => console.log(`Server running on port ${port}`));
+const port = process.env.PORT || 3001;
+server.listen(port, () => logger.info(`Server running on port ${port}`));

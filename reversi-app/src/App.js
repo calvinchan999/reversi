@@ -15,18 +15,15 @@ function App() {
   const [chatMessage, setChatMessage] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
   const [gameOver, setGameOver] = useState(false);
-  const [score, setScore] = useState({ whiteScore: 0, blackScore: 0 });
+  const [score, setScore] = useState({ whiteScore: 2, blackScore: 2 });
+  const [gameMode, setGameMode] = useState("human");
 
   const chatEndRef = useRef(null);
 
   useEffect(() => {
     socket.on("updateBoard", (newBoard) => {
       setBoard(newBoard);
-    });
-
-    socket.on("score", (score) => {
-      const { whiteCount, blackCount } = score;
-      setScore({ whiteScore: whiteCount, blackScore: blackCount });
+      updateScore(newBoard);
     });
 
     socket.on("switchTurn", (player) => {
@@ -35,7 +32,7 @@ function App() {
 
     socket.on("playerColor", (color) => {
       setPlayerColor(color);
-      setMessage(`You are ${color}. Waiting for opponent...`);
+      setMessage(`You are ${color}. ${gameMode === 'ai' ? 'Playing against AI...' : 'Waiting for opponent...'}`);
       setIsJoining(false);
     });
 
@@ -55,6 +52,7 @@ function App() {
       setPlayerColor(null);
       setRoomId("");
       setIsJoining(false);
+      setGameOver(true);
     });
 
     socket.on("chatMessage", (msg) => {
@@ -83,23 +81,30 @@ function App() {
       socket.off("gameOver");
       socket.off("skipTurn");
     };
-  }, []);
+  }, [gameMode]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
+
+  const updateScore = (newBoard) => {
+    const whiteCount = newBoard.filter(cell => cell === 'white').length;
+    const blackCount = newBoard.filter(cell => cell === 'black').length;
+    setScore({ whiteScore: whiteCount, blackScore: blackCount });
+  };
 
   const handleJoinRoom = (e) => {
     e.preventDefault();
     if (roomId && !isJoining) {
       setIsJoining(true);
       setMessage("Joining room...");
-      socket.emit("joinRoom", roomId);
+      console.log(`Joining room roomId:${roomId} gameMode:${gameMode}`)
+      socket.emit("joinRoom", roomId, gameMode);
     }
   };
 
   const handleCellClick = (index) => {
-    if (gameStarted && currentPlayer === playerColor) {
+    if (gameStarted && currentPlayer === playerColor && !gameOver) {
       socket.emit("makeMove", { index, player: playerColor, roomId });
     }
   };
@@ -122,9 +127,8 @@ function App() {
     if (value === "white") cellClass += " white";
 
     return (
-      <div className="cell-container">
+      <div className="cell-container" key={index}>
         <div
-          key={index}
           className={cellClass}
           onClick={() => handleCellClick(index)}
         ></div>
@@ -132,35 +136,59 @@ function App() {
     );
   };
 
+  const resetGame = () => {
+    setBoard(Array(64).fill(null));
+    setCurrentPlayer("black");
+    setPlayerColor(null);
+    setRoomId("");
+    setGameStarted(false);
+    setIsJoining(false);
+    setMessage("");
+    setChatHistory([]);
+    setGameOver(false);
+    setScore({ whiteScore: 2, blackScore: 2 });
+  };
+
   return (
     <div className="app">
       <h1>Reversi</h1>
       {!gameStarted && !gameOver ? (
-        <form onSubmit={handleJoinRoom}>
-          <input
-            type="text"
-            value={roomId}
-            onChange={(e) => setRoomId(e.target.value)}
-            placeholder="Enter room ID"
-            disabled={isJoining}
-          />
-          <button type="submit" disabled={isJoining}>
-            Join Room
-          </button>
-        </form>
-      ) : gameOver ? (
-        <p>{message}</p>
+        <div className="setup-container">
+          <form onSubmit={handleJoinRoom}>
+            <input
+              type="text"
+              value={roomId}
+              onChange={(e) => setRoomId(e.target.value)}
+              placeholder="Enter room ID"
+              disabled={isJoining}
+            />
+            <select
+              value={gameMode}
+              onChange={(e) => setGameMode(e.target.value)}
+              disabled={isJoining}
+            >
+              <option value="human">Human vs Human</option>
+              <option value="ai">Human vs AI</option>
+            </select>
+            <button type="submit" disabled={isJoining}>
+              Join Room
+            </button>
+          </form>
+        </div>
       ) : (
         <div className="game-container">
           <div className="game-board">
             <div className="board">
               {board.map((cell, index) => renderCell(cell, index))}
             </div>
-            <p>Current player: {currentPlayer}</p>
-            <p>You are: {playerColor}</p>
-            <p>
-              White: {score.whiteScore} Black: {score.blackScore}{" "}
-            </p>
+            <div className="game-info">
+              <p>Current player: <span className={`player-${currentPlayer}`}>{currentPlayer}</span></p>
+              <p>You are: <span className={`player-${playerColor}`}>{playerColor}</span></p>
+              <p>
+                White: <span className="player-white">{score.whiteScore}</span> &nbsp;
+                Black: <span className="player-black">{score.blackScore}</span>
+              </p>
+            </div>
           </div>
           <div className="chat-container">
             <div className="chat-history">
@@ -171,8 +199,7 @@ function App() {
                     msg.player === playerColor ? "my-message" : "other-message"
                   }`}
                 >
-                  {/* <span className="player-id">{msg.socketId}</span><br/> */}
-                  <span className="player-color">{msg.player}:</span>
+                  <span className={`player-${msg.player}`}>{msg.player}:</span>
                   {msg.message}
                 </div>
               ))}
@@ -191,6 +218,11 @@ function App() {
         </div>
       )}
       {message && <p className="status-message">{message}</p>}
+      {gameOver && (
+        <button onClick={resetGame} className="reset-button">
+          Play Again
+        </button>
+      )}
     </div>
   );
 }
