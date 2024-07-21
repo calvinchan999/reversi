@@ -17,22 +17,40 @@ function App() {
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState({ whiteScore: 2, blackScore: 2 });
   const [gameMode, setGameMode] = useState("human");
+  const [legalMoves, setLegalMoves] = useState([]);
+  const [showPreviousBoard, setShowPreviousBoard] = useState(false);
 
   const chatEndRef = useRef(null);
 
   useEffect(() => {
+    let i = 0;
     socket.on("updateBoard", (newBoard) => {
       setBoard(newBoard);
       updateScore(newBoard);
+      // todo
+      // if (i > 0) {
+      //   setPreviousBoard(newBoard);
+      // }
+      i++;
+      setLegalMoves([]); // Reset legal moves when board updates
     });
 
     socket.on("switchTurn", (player) => {
       setCurrentPlayer(player);
+      if (player === playerColor) {
+        fetchLegalMoves();
+      }
     });
 
     socket.on("playerColor", (color) => {
       setPlayerColor(color);
-      setMessage(`You are ${color}. ${gameMode === 'ai' ? 'Playing against AI...' : 'Waiting for opponent...'}`);
+      setMessage(
+        `You are ${color}. ${
+          gameMode === "ai"
+            ? "Playing against AI..."
+            : "Waiting for opponent..."
+        }`
+      );
       setIsJoining(false);
     });
 
@@ -80,17 +98,24 @@ function App() {
       socket.off("chatMessage");
       socket.off("gameOver");
       socket.off("skipTurn");
+      socket.off("legalMoves");
     };
-  }, [gameMode]);
+  }, [gameMode, playerColor, board]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
 
   const updateScore = (newBoard) => {
-    const whiteCount = newBoard.filter(cell => cell === 'white').length;
-    const blackCount = newBoard.filter(cell => cell === 'black').length;
+    const whiteCount = newBoard.filter((cell) => cell === "white").length;
+    const blackCount = newBoard.filter((cell) => cell === "black").length;
     setScore({ whiteScore: whiteCount, blackScore: blackCount });
+  };
+
+  const fetchLegalMoves = () => {
+    socket.emit("getLegalMoves", { player: playerColor, roomId }, (moves) => {
+      setLegalMoves(moves);
+    });
   };
 
   const handleJoinRoom = (e) => {
@@ -98,7 +123,7 @@ function App() {
     if (roomId && !isJoining) {
       setIsJoining(true);
       setMessage("Joining room...");
-      console.log(`Joining room roomId:${roomId} gameMode:${gameMode}`)
+      console.log(`Joining room roomId:${roomId} gameMode:${gameMode}`);
       socket.emit("joinRoom", roomId, gameMode);
     }
   };
@@ -125,13 +150,12 @@ function App() {
     let cellClass = "cell";
     if (value === "black") cellClass += " black";
     if (value === "white") cellClass += " white";
+    if (legalMoves.includes(index)) cellClass += " legal-move";
+    console.log(legalMoves);
 
     return (
       <div className="cell-container" key={index}>
-        <div
-          className={cellClass}
-          onClick={() => handleCellClick(index)}
-        ></div>
+        <div className={cellClass} onClick={() => handleCellClick(index)}></div>
       </div>
     );
   };
@@ -147,6 +171,8 @@ function App() {
     setChatHistory([]);
     setGameOver(false);
     setScore({ whiteScore: 2, blackScore: 2 });
+    setLegalMoves([]);
+    setShowPreviousBoard(false);
   };
 
   return (
@@ -182,12 +208,25 @@ function App() {
               {board.map((cell, index) => renderCell(cell, index))}
             </div>
             <div className="game-info">
-              <p>Current player: <span className={`player-${currentPlayer}`}>{currentPlayer}</span></p>
-              <p>You are: <span className={`player-${playerColor}`}>{playerColor}</span></p>
               <p>
-                White: <span className="player-white">{score.whiteScore}</span> &nbsp;
-                Black: <span className="player-black">{score.blackScore}</span>
+                Current player:{" "}
+                <span className={`player-${currentPlayer}`}>
+                  {currentPlayer}
+                </span>
               </p>
+              <p>
+                You are:{" "}
+                <span className={`player-${playerColor}`}>{playerColor}</span>
+              </p>
+              <p>
+                White: <span className="player-white">{score.whiteScore}</span>{" "}
+                &nbsp; Black:{" "}
+                <span className="player-black">{score.blackScore}</span>
+              </p>
+              <div className="game-info-btn">
+                <button>Previous</button>
+                <button>Current Step</button>
+              </div>
             </div>
           </div>
           <div className="chat-container">

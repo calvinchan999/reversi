@@ -22,6 +22,9 @@ const BOARD_SIZE = 64;
 const INITIAL_BLACK_POSITIONS = [27, 36];
 const INITIAL_WHITE_POSITIONS = [28, 35];
 
+const RETRY_DELAY = 1000; // 1 second
+const MAX_RETRIES = 3;
+
 const logger = winston.createLogger({
   level: "info",
   format: winston.format.json(),
@@ -51,7 +54,7 @@ function createGame() {
 const directions = [-9, -8, -7, -1, 1, 7, 8, 9];
 
 function isValidMove(board, player, index) {
-  if (board[index] !== null) return false;
+  if (index < 0 || index >= BOARD_SIZE || board[index] !== null) return false;
 
   const opponent = player === "black" ? "white" : "black";
 
@@ -168,68 +171,116 @@ async function setGame(roomId, game) {
   }
 }
 
+// AI Bot logic
+function getBotMove(game) {
+  const validMoves = getValidMoves(game.board, game.currentPlayer);
+  if (validMoves.length === 0) return null;
+
+  // Simple strategy: choose the move that flips the most pieces
+  let bestMove = validMoves[0];
+  let maxFlipped = 0;
+
+  for (const move of validMoves) {
+    const tempBoard = [...game.board];
+    makeMove(tempBoard, move, game.currentPlayer);
+    const flippedCount = tempBoard.filter(cell => cell === game.currentPlayer).length - 
+                         game.board.filter(cell => cell === game.currentPlayer).length;
+    
+    if (flippedCount > maxFlipped) {
+      maxFlipped = flippedCount;
+      bestMove = move;
+    }
+  }
+
+  return bestMove;
+}
+
+function createAIGame(roomId, mode) {
+  const game = createGame();
+  game.mode = mode;
+  game.players.black = 'human';
+  game.players.white = 'ai';
+  return game;
+}
+
+async function createAndSaveGame(roomId, mode) {
+  const game = mode === 'ai' ? createAIGame(roomId, mode) : createGame();
+  await setGame(roomId, game);
+  return new Promise(resolve => setTimeout(() => resolve(game), 100)); // Small delay to ensure Redis saves the game
+}
+
 io.on("connection", (socket) => {
   logger.info("New client connected");
 
   socket.on("joinRoom", async (roomId, mode) => {
     logger.info(`Player attempting to join room: ${roomId} mode: ${mode}`);
 
-    try {
-      let game = await getGame(roomId);
-      if (!game) {
-        logger.info(`Creating new room: ${roomId}`);
-        game = createGame();
-        game.mode = mode;
-        await setGame(roomId, game);
-      }
+    let retries = 0;
+    const attemptJoin = async () => {
+      try {
+        let game = await getGame(roomId);
+        if (!game) {
+          logger.info(`Creating new room: ${roomId}`);
+          game = await createAndSaveGame(roomId, mode);
+        }
 
-      if (!game.players.black) {
-        game.players.black = socket.id;
-        socket.join(roomId);
-        socket.emit("playerColor", "black");
-        logger.info(`Player ${socket.id} joined room ${roomId} as black`);
-      } else if (!game.players.white) {
-        if (mode === "ai") {
-          game.players.white = "ai";
-          logger.info(`AI joined room ${roomId} as white`);
-        } else {
+        if (mode === 'ai' && game.players.black === 'human' && game.players.white === 'ai') {
+          socket.join(roomId);
+          socket.emit("playerColor", "black");
+          logger.info(`Player ${socket.id} joined AI room ${roomId} as black`);
+        } else if (!game.players.black) {
+          game.players.black = socket.id;
+          socket.join(roomId);
+          socket.emit("playerColor", "black");
+          logger.info(`Player ${socket.id} joined room ${roomId} as black`);
+        } else if (!game.players.white && mode !== 'ai') {
           game.players.white = socket.id;
           socket.join(roomId);
           socket.emit("playerColor", "white");
           logger.info(`Player ${socket.id} joined room ${roomId} as white`);
+        } else {
+          logger.info(`Room ${roomId} is full or incompatible mode, rejecting player ${socket.id}`);
+          socket.emit("roomFull");
+          return;
         }
-      } else {
-        logger.info(`Room ${roomId} is full, rejecting player ${socket.id}`);
-        socket.emit("roomFull");
-        return;
-      }
 
-      await setGame(roomId, game);
+        await setGame(roomId, game);
 
-      socket.emit("updateBoard", game.board);
-      socket.emit("switchTurn", game.currentPlayer);
+        socket.emit("updateBoard", game.board);
+        socket.emit("switchTurn", game.currentPlayer);
 
-      if (game.players.black && game.players.white) {
-        logger.info(`Game in room ${roomId} is starting`);
-        io.to(roomId).emit("gameStart");
-        if (game.mode === "ai" && game.currentPlayer === "white") {
-          await handleAIMove(roomId);
+        if (game.players.black && game.players.white) {
+          logger.info(`Game in room ${roomId} is starting`);
+          io.to(roomId).emit("gameStart");
+          if (game.mode === "ai" && game.currentPlayer === "white") {
+            await handleAIMove(roomId);
+          }
+        }
+
+        const blackCount = game.board.filter((cell) => cell === "black").length;
+        const whiteCount = game.board.filter((cell) => cell === "white").length;
+        io.to(roomId).emit("score", { blackCount, whiteCount });
+      } catch (error) {
+        logger.error(`Error in joinRoom attempt ${retries + 1}: ${error}`);
+        if (retries < MAX_RETRIES) {
+          retries++;
+          setTimeout(attemptJoin, RETRY_DELAY);
+        } else {
+          socket.emit("error", "Failed to join the room after multiple attempts");
         }
       }
+    };
 
-      const blackCount = game.board.filter((cell) => cell === "black").length;
-      const whiteCount = game.board.filter((cell) => cell === "white").length;
-      io.to(roomId).emit("score", { blackCount, whiteCount });
-    } catch (error) {
-      logger.error(`Error in joinRoom: ${error}`);
-      socket.emit("error", "An error occurred while joining the room");
-    }
+    attemptJoin();
   });
 
   async function handleAIMove(roomId) {
     try {
       const game = await getGame(roomId);
       if (game && game.currentPlayer === "white" && game.players.white === "ai") {
+        // Wait for 5 seconds
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
         const aiMove = getBotMove(game);
         if (aiMove !== null) {
           makeMove(game.board, aiMove, "white");
@@ -317,6 +368,22 @@ io.on("connection", (socket) => {
     } catch (error) {
       logger.error(`Error in sendMessage: ${error}`);
       socket.emit("error", "An error occurred while sending a message");
+    }
+  });
+
+  socket.on("getLegalMoves", async ({ player, roomId }, callback) => {
+    try {
+      const game = await getGame(roomId);
+      if (game) {
+        console.log('test: ', player);
+        const legalMoves = getValidMoves(game.board, player);
+        callback(legalMoves);
+      } else {
+        callback([]);
+      }
+    } catch (error) {
+      logger.error(`Error in getLegalMoves: ${error}`);
+      callback([]);
     }
   });
 

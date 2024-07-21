@@ -11,6 +11,18 @@
   gap: 20px;
 }
 
+.game-info {
+  position: relative;
+}
+
+.game-info-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  gap: 5px;
+}
+
 .board {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
@@ -31,7 +43,6 @@
   width: 40px;
   height: 40px;
   background-color: #27ae60;
-  
 }
 
 .cell.black {
@@ -46,6 +57,10 @@
   border-radius: 50%;
   cursor: pointer;
   border: 1px solid #000;
+}
+
+.cell.legal-move {
+  background-color: rgba(0, 255, 0, 0.6);
 }
 
 .chat-container {
@@ -120,7 +135,8 @@ form {
   margin-bottom: 20px;
 }
 
-input, button {
+input,
+button {
   padding: 5px 10px;
 }
 
