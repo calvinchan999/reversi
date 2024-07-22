@@ -4,6 +4,8 @@
   align-items: center;
   font-family: Arial, sans-serif;
   padding: 20px;
+  /* max-width: 100vw; */
+  box-sizing: border-box;
 }
 
 .game-container {
@@ -133,6 +135,7 @@ form {
   display: flex;
   gap: 10px;
   margin-bottom: 20px;
+  flex-direction: column;
 }
 
 input,
