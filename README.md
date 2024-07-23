@@ -10,6 +10,7 @@ This repository contains a full-stack implementation of the classic board game R
 - Implement MySQL Database to store game results.
 - Create a 3D Reversi game with Node.js, React.js, and Three.js (8x8x6 grid).
 - Develop mobile versions to support Android and iOS platforms.
+- Add support for Helm Chart for K8s deployment.
 
 # Client: Reversi Game App (React)
 
