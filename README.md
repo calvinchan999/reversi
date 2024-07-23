@@ -2,6 +2,81 @@
 
 This repository contains a full-stack implementation of the classic board game Reversi. It consists of a Node.js backend with Socket.IO for real-time communication.
 
+## Future Improvements
+
+- Add a spectator mode for other users to watch ongoing games.
+- Implement a ranking system for players.
+- Add more AI difficulty levels.
+- Implement MySQL Database to store game results.
+- Create a 3D Reversi game with Node.js, React.js, and Three.js (8x8x6 grid).
+- Develop mobile versions to support Android and iOS platforms.
+
+# Client: Reversi Game App (React)
+
+## Features
+
+1. **Game Modes**:
+   - Human vs Human
+   - Human vs AI
+
+2. **Multiplayer Functionality**:
+   - Join rooms using unique room IDs
+   - Real-time game updates using Socket.IO
+
+3. **Game Board**:
+   - 8x8 grid
+   - Visual representation of black and white pieces
+   - Highlighting of legal moves
+
+4. **Game Logic**:
+   - Implemented on the server-side (not shown in the provided code)
+   - Handles move validation, turn switching, and game ending conditions
+
+5. **Chat System**:
+   - Real-time chat functionality for players in the same room
+
+6. **Game Information Display**:
+   - Current player turn
+   - Player color assignment
+   - Score tracking (number of pieces for each player)
+
+7. **Move History**:
+   - Navigate through previous game states
+   - View the current game state
+
+8. **I18n**:
+   - Supports multiple languages (English and Traditional Chinese)
+
+9. **Responsive Design**:
+   - Adapts to different screen sizes (CSS not provided in the given code)
+
+## Technical Stack
+
+- **Frontend**: React.js
+- **State Management**: React Hooks (useState, useEffect)
+- **Routing**: React Router
+- **Real-time Communication**: Socket.IO client
+- **Internationalization**: react-i18next
+
+## Setup and Installation
+
+1. Ensure you have Node.js and npm installed on your system.
+2. Clone the repository to your local machine.
+3. Navigate to the project directory and run `npm ci` to install dependencies.
+4. Start the development server with `npm start`.
+5. The app should now be running on `http://localhost:3000`.
+
+Note: This frontend application requires a corresponding backend server running on `http://localhost:3001` to handle game logic and Socket.IO connections.
+
+## How to Play
+
+1. Enter a room ID and select a game mode (Human vs Human or Human vs AI).
+2. Click "Join Room" to enter the game.
+3. The game starts when two players join the room (or one player for AI mode).
+4. Click on a highlighted cell to make a move during your turn.
+5. Use the chat feature to communicate with your opponent.
+6. The game ends when no more moves are possible. The player with the most pieces wins.
+
 ## Server: Reversi Node.js Backend
 
 The server is a Node.js application that handles game logic, real-time communication, and persistent storage using Redis.
