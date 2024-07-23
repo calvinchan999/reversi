@@ -4,4 +4,4 @@
 **/reversi-server/node_modules
 **/reversi-server/node_modules/**
 
-**/history
+**/.history
