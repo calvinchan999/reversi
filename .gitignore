@@ -5,3 +5,4 @@
 **/reversi-server/node_modules/**
 
 **/.history
+**/.env
