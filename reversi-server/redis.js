@@ -4,9 +4,9 @@ class Redis {
   static connection;
   constructor() {}
 
-  static setConnection(config = { port, host, password }) {
+  static setConnection({ port, host, password }) {
     if (!this.connection) {
-      this.connection = new IORedis(config);
+      this.connection = new IORedis({ port, host, password });
     }
   }
 

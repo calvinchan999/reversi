@@ -3,7 +3,6 @@ require("dotenv").config();
 const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
-const winston = require("winston");
 const db = require("./database/db");
 
 const app = express();
@@ -17,6 +16,9 @@ const io = socketIo(server, {
 
 const Redis = require("./redis");
 
+const loggerInstance = require("./logger");
+const logger = loggerInstance.getLogger();
+
 const {
   createGame,
   getValidMoves,
@@ -26,39 +28,23 @@ const {
   createAIGame,
 } = require("./reversi");
 
-const redis = Redis.setConnection({
+Redis.setConnection({
   port: 6379,
   host: process.env.HOST,
   password: process.env.PASSWORD,
 });
+
+const Room = require("./room");
+const rooms = require("./routes/rooms");
 
 const GAME_TTL = 3600;
 
 const RETRY_DELAY = 1000; // 1 second
 const MAX_RETRIES = 3;
 
-const logger = winston.createLogger({
-  level: "info",
-  format: winston.format.json(),
-  transports: [
-    new winston.transports.File({ filename: "error.log", level: "error" }),
-    new winston.transports.File({ filename: "combined.log" }),
-  ],
-});
-
-if (process.env.NODE_ENV !== "production") {
-  logger.add(
-    new winston.transports.Console({
-      format: winston.format.simple(),
-    })
-  );
-}
-
-const rooms = require("./routes/rooms");
-
 async function getGame(roomId) {
   try {
-    const gameString = await redis.connection.get(`game:${roomId}`);
+    const gameString = await Redis.connection.get(`game:${roomId}`);
     return gameString ? JSON.parse(gameString) : null;
   } catch (error) {
     logger.error(`Error getting game: ${error}`);
@@ -68,7 +54,7 @@ async function getGame(roomId) {
 
 async function setGame(roomId, game) {
   try {
-    await redis.connection.set(
+    await Redis.connection.set(
       `game:${roomId}`,
       JSON.stringify(game),
       "EX",
@@ -82,6 +68,10 @@ async function setGame(roomId, game) {
 async function createAndSaveGame(roomId, mode) {
   const game = mode === "ai" ? createAIGame(roomId, mode) : createGame();
   await setGame(roomId, game);
+  
+  const room = new Room(Redis.connection);
+  const rooms = await room.getRooms();
+  io.emit("roomsUpdated", rooms);
   return new Promise((resolve) => setTimeout(() => resolve(game), 100)); // Small delay to ensure Redis saves the game
 }
 
@@ -276,9 +266,20 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("requestRooms", async () => {
+    try {
+      const room = new Room(Redis.connection);
+      const rooms = await room.getRooms();
+      socket.emit("roomsUpdated", rooms);
+    } catch (error) {
+      logger.error(`Error fetching rooms: ${error}`);
+      // socket.emit("error", "Failed to fetch rooms");
+    }
+  });
+
   socket.on("disconnect", async () => {
     try {
-      const rooms = await redis.connection.keys("game:*");
+      const rooms = await Redis.connection.keys("game:*");
       for (let roomKey of rooms) {
         const roomId = roomKey.split(":")[1];
         const game = await getGame(roomId);
@@ -287,7 +288,7 @@ io.on("connection", (socket) => {
           (game.players.black === socket.id || game.players.white === socket.id)
         ) {
           io.to(roomId).emit("playerDisconnected");
-          await redis.connection.del(`game:${roomId}`);
+          await Redis.connection.del(`game:${roomId}`);
           break;
         }
       }
@@ -303,7 +304,7 @@ io.on("connection", (socket) => {
 app.use("/api/v1/rooms", rooms);
 
 const port = process.env.PORT || 3001;
-server.listen(port, () => {
+server.listen(port, async () => {
   logger.info(`Server running on port ${port}`);
 
   // main();

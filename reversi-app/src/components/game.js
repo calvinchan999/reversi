@@ -1,7 +1,7 @@
 import "./game.css";
 import React, { useState, useEffect, useRef } from "react";
 import io from "socket.io-client";
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from "react-i18next";
 
 const socket = io("http://localhost:3001");
 
@@ -23,6 +23,7 @@ function Game() {
   const [legalMoves, setLegalMoves] = useState([]);
   const [boardHistory, setBoardHistory] = useState([]);
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
+  const [rooms, setRooms] = useState();
 
   const chatEndRef = useRef(null);
 
@@ -92,6 +93,12 @@ function Game() {
       setMessage(message);
     });
 
+    socket.on("roomsUpdated", (updatedRooms) => {
+      setRooms(updatedRooms);
+    });
+
+    socket.emit("requestRooms");
+
     return () => {
       socket.off("updateBoard");
       socket.off("switchTurn");
@@ -103,6 +110,7 @@ function Game() {
       socket.off("gameOver");
       socket.off("skipTurn");
       socket.off("legalMoves");
+      socket.off("roomsUpdated");
     };
   }, [gameMode, playerColor, board]);
 
@@ -213,15 +221,31 @@ function Game() {
 
   return (
     <div className="app">
-      <h1>{t('reversi')}</h1>
+      <h1>{t("reversi")}</h1>
       {!gameStarted && !gameOver ? (
         <div className="setup-container">
+          <h2>Available Rooms</h2>
+          <ul className="room-list">
+            {rooms?.map((room) => (
+              <li key={room.id} className="room-item">
+                <span>Room ID: {room.roomId}</span>
+                <span>Players: {room.totalPlayers} /2</span>
+                <button
+                  onClick={() => handleJoinRoom(room.id)}
+                  disabled={room.totalPlayers === 2}
+                >
+                  Join Room
+                </button>
+              </li>
+            ))}
+          </ul>
+          <h2>Or Create a New Room</h2>
           <form onSubmit={handleJoinRoom}>
             <input
               type="text"
               value={roomId}
               onChange={(e) => setRoomId(e.target.value)}
-              placeholder="Enter room ID"
+              placeholder="Enter new room ID"
               disabled={isJoining}
             />
             <select
@@ -233,7 +257,7 @@ function Game() {
               <option value="ai">Human vs AI</option>
             </select>
             <button type="submit" disabled={isJoining}>
-              Join Room
+              Create and Join Room
             </button>
           </form>
         </div>
