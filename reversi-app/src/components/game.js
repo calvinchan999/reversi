@@ -37,7 +37,6 @@ function Game() {
         { board: newBoard, player: currentPlayer },
       ]);
       setCurrentHistoryIndex((prevIndex) => prevIndex + 1);
-      console.log(boardHistory);
     });
 
     socket.on("switchTurn", (player) => {
@@ -112,7 +111,7 @@ function Game() {
       socket.off("legalMoves");
       socket.off("roomsUpdated");
     };
-  }, [gameMode, playerColor, board, boardHistory, currentPlayer]);
+  }, [gameMode, playerColor, board]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
