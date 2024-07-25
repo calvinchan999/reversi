@@ -1,3 +1,6 @@
+const loggerInstance = require("./logger");
+const logger = loggerInstance.getLogger();
+
 const BOARD_SIZE = 64;
 const INITIAL_BLACK_POSITIONS = [27, 36];
 const INITIAL_WHITE_POSITIONS = [28, 35];

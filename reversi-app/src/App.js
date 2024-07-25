@@ -12,9 +12,12 @@ import {
 } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
+import ProtectedRoute from "./guards/protectedRoute";
+import Login from "./components/login";
 import Game from "./components/game"; // Your main game component
 
 function LanguageHandler({ children }) {
+  console.log(process.env)
   const { lng } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -53,13 +56,23 @@ function AppContent() {
         <Route path="/" element={<Navigate to="/en/app" replace />} />
         <Route path="/:lng" element={<LanguageRedirect />} />
         <Route
-          path="/:lng/app"
+          path="/:lng/login"
           element={
             <LanguageHandler>
-              <Game />
+              <Login />
             </LanguageHandler>
           }
-        />
+        ></Route>
+        <Route element={<ProtectedRoute />}>
+          <Route
+            path="/:lng/app"
+            element={
+              <LanguageHandler>
+                <Game />
+              </LanguageHandler>
+            }
+          />
+        </Route>
         <Route path="*" element={<div>404 - Not Found</div>} />
       </Routes>
     </div>
@@ -67,7 +80,6 @@ function AppContent() {
 }
 
 function App() {
-  console.log("Rendering App");
   return (
     <Router>
       <AppContent />

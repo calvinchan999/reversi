@@ -112,7 +112,7 @@ function Game() {
       socket.off("legalMoves");
       socket.off("roomsUpdated");
     };
-  }, [gameMode, playerColor, board]);
+  }, [gameMode, playerColor, board, boardHistory, currentPlayer]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -226,8 +226,8 @@ function Game() {
         <div className="setup-container">
           <h2>Available Rooms</h2>
           <ul className="room-list">
-            {rooms?.map((room) => (
-              <li key={room.id} className="room-item">
+            {rooms?.map((room, i) => (
+              <li key={i} className="room-item">
                 <span>Room ID: {room.roomId}</span>
                 <span>Players: {room.totalPlayers} /2</span>
                 <button
