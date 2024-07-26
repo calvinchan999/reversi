@@ -3,24 +3,26 @@ import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
+import { useSelector } from "react-redux";
+import axios from "axios";
 
 function Login() {
   const { t } = useTranslation();
+  const config = useSelector((state) => state.config);
 
-  const handleGoogleLoginSuccess = (credentialResponse) => {
+  const handleGoogleLoginSuccess = async (credentialResponse) => {
     const { credential } = credentialResponse;
-    const decodedToken = jwtDecode(credential);
+    const decodedCredential = jwtDecode(credential);
 
-    console.log("Decoded token:", decodedToken);
+    console.log("Decoded token:", decodedCredential);
 
-    const {
-      email,
-      name,
-      picture,
-      given_name,
-      family_name,
-      sub: googleId,
-    } = decodedToken;
+    const response = await axios.post(
+      `${config.SERVER_URL}/api/auth/google`,
+      decodedCredential
+    );
+
+    const { token } = response.data;
+    sessionStorage.setItem("accessToken", token);
   };
 
   const handleGoogleLoginError = () => {

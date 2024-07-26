@@ -1,3 +1,4 @@
 {
-  "GOOGLE_SSO_CLIENT_ID": "1079399845150-37jdjt04eu3lang7p4casg6k9tcrdbpr.apps.googleusercontent.com"
+  "GOOGLE_SSO_CLIENT_ID": "1079399845150-37jdjt04eu3lang7p4casg6k9tcrdbpr.apps.googleusercontent.com",
+  "SERVER_URL": "http://localhost:3000"
 }

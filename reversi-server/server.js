@@ -4,7 +4,7 @@ const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
 const db = require("./database/db");
-
+const cors = require("cors");
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
@@ -18,6 +18,8 @@ const Redis = require("./redis");
 
 const loggerInstance = require("./logger");
 const logger = loggerInstance.getLogger();
+
+const bodyParser = require("body-parser");
 
 const {
   createGame,
@@ -36,6 +38,7 @@ Redis.setConnection({
 
 const Room = require("./room");
 const rooms = require("./routes/rooms");
+const auth = require('./routes/auth');
 
 const GAME_TTL = 3600;
 
@@ -299,9 +302,10 @@ io.on("connection", (socket) => {
   });
 });
 
-// app.use(cors());
-
-app.use("/api/v1/rooms", rooms);
+app.use(cors());
+app.use(bodyParser.json());
+app.use("/api/rooms", rooms);
+app.use('/api/auth', auth);
 
 const port = process.env.PORT || 3001;
 server.listen(port, async () => {

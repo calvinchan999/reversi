@@ -16,8 +16,9 @@ import ProtectedRoute from "./guards/protectedRoute";
 import Login from "./components/login";
 import Game from "./components/game"; // Your main game component
 
+import { useSelector } from 'react-redux';
+
 function LanguageHandler({ children }) {
-  console.log(process.env)
   const { lng } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -80,6 +81,8 @@ function AppContent() {
 }
 
 function App() {
+  const config = useSelector(state => state.config);
+  console.log(config);
   return (
     <Router>
       <AppContent />

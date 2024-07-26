@@ -1,15 +1,15 @@
 import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, Outlet } from 'react-router-dom';
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = () => {
   const location = useLocation();
-  const token = sessionStorage.getItem('jwt');
+  const token = sessionStorage.getItem('accessToken');
 
   if (!token) {
     return <Navigate to={`/${location.pathname.split('/')[1]}/login`} state={{ from: location }} replace />;
   }
 
-  return children;
+  return <Outlet />;
 };
 
 export default ProtectedRoute;
