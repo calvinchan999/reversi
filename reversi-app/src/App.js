@@ -11,12 +11,13 @@ import {
   useLocation,
 } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import axios from "axios";
 
 import ProtectedRoute from "./guards/protectedRoute";
 import Login from "./components/login";
 import Game from "./components/game"; // Your main game component
 
-import { useSelector } from 'react-redux';
+import { useSelector } from "react-redux";
 
 function LanguageHandler({ children }) {
   const { lng } = useParams();
@@ -50,7 +51,37 @@ const LanguageRedirect = () => {
   return <Navigate to={`/${lng}/app`} replace />;
 };
 
-function AppContent() {
+function AppContent({ config }) {
+  const navigate = useNavigate();
+  const { i18n } = useTranslation();
+  const location = useLocation();
+
+  useEffect(() => {
+    const fetchVersionInfo = async () => {
+      const token = sessionStorage.getItem("accessToken");
+      try {
+        const response = await axios.get(`${config.SERVER_URL}/api/version`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response){
+          if (location.pathname === `/${i18n.language}/login`) {
+            navigate(`/${i18n.language}/app`, { replace: true });
+          }
+        }else {
+          navigate(`/${i18n.language}/login`, { replace: true });
+        }
+      } catch (err) {
+        console.log(err);
+        navigate(`/${i18n.language}/login`, { replace: true });
+      }
+    };
+
+    fetchVersionInfo();
+  }, []);
+
   return (
     <div className="app">
       <Routes>
@@ -81,11 +112,11 @@ function AppContent() {
 }
 
 function App() {
-  const config = useSelector(state => state.config);
+  const config = useSelector((state) => state.config);
   console.log(config);
   return (
     <Router>
-      <AppContent />
+      <AppContent config={config} />
     </Router>
   );
 }

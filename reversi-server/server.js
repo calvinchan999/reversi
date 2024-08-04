@@ -1,4 +1,5 @@
 require("dotenv").config();
+const packageJson = require("./package.json");
 
 const express = require("express");
 const http = require("http");
@@ -36,9 +37,11 @@ Redis.setConnection({
   password: process.env.PASSWORD,
 });
 
+const { validateToken } = require("./middleware");
+
 const Room = require("./room");
 const rooms = require("./routes/rooms");
-const auth = require('./routes/auth');
+const auth = require("./routes/auth");
 
 const GAME_TTL = 3600;
 
@@ -71,7 +74,7 @@ async function setGame(roomId, game) {
 async function createAndSaveGame(roomId, mode) {
   const game = mode === "ai" ? createAIGame(roomId, mode) : createGame();
   await setGame(roomId, game);
-  
+
   const room = new Room(Redis.connection);
   const rooms = await room.getRooms();
   io.emit("roomsUpdated", rooms);
@@ -304,8 +307,16 @@ io.on("connection", (socket) => {
 
 app.use(cors());
 app.use(bodyParser.json());
+
+app.get("/api/version", validateToken, (req, res) => {
+  const { version } = packageJson.version;
+  res.json({
+    version,
+  });
+});
+
 app.use("/api/rooms", rooms);
-app.use('/api/auth', auth);
+app.use("/api/auth", auth);
 
 const port = process.env.PORT || 3001;
 server.listen(port, async () => {
