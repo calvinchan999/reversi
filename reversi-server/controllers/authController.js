@@ -13,7 +13,6 @@ exports.googleAuth = async (req, res, next) => {
       email_verified
     } = req.body;
    
-
     if (!email || !email_verified) {
       return res.status(400).json({ error: 'Valid email required' });
     }

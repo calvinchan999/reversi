@@ -66,20 +66,22 @@ function AppContent({ config }) {
           },
         });
 
-        if (response){
+        if (response) {
           if (location.pathname === `/${i18n.language}/login`) {
             navigate(`/${i18n.language}/app`, { replace: true });
           }
-        }else {
+        } else {
+          sessionStorage.removeItem("accessToken")
           navigate(`/${i18n.language}/login`, { replace: true });
         }
       } catch (err) {
         console.log(err);
+        sessionStorage.removeItem("accessToken")
         navigate(`/${i18n.language}/login`, { replace: true });
       }
     };
 
-    fetchVersionInfo();
+    if (location.pathname.indexOf("login") < -1 || sessionStorage.getItem("accessToken")) fetchVersionInfo();
   }, []);
 
   return (
