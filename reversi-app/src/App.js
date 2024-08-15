@@ -14,8 +14,12 @@ import { useTranslation } from "react-i18next";
 import axios from "axios";
 
 import ProtectedRoute from "./guards/protectedRoute";
+// functional component
 import Login from "./components/login";
 import Game from "./components/game"; // Your main game component
+
+// ui component
+import TopBar from "./components/topBar";
 
 import { useSelector } from "react-redux";
 
@@ -55,6 +59,13 @@ function AppContent({ config }) {
   const navigate = useNavigate();
   const { i18n } = useTranslation();
   const location = useLocation();
+  const user = useSelector((state) => state.user);
+
+  useEffect(() => {
+    if (user) {
+      navigate(`/${i18n.language}/app`, { replace: true });
+    }
+  }, [user]);
 
   useEffect(() => {
     const fetchVersionInfo = async () => {
@@ -71,21 +82,25 @@ function AppContent({ config }) {
             navigate(`/${i18n.language}/app`, { replace: true });
           }
         } else {
-          sessionStorage.removeItem("accessToken")
+          sessionStorage.removeItem("accessToken");
           navigate(`/${i18n.language}/login`, { replace: true });
         }
       } catch (err) {
         console.log(err);
-        sessionStorage.removeItem("accessToken")
+        sessionStorage.removeItem("accessToken");
         navigate(`/${i18n.language}/login`, { replace: true });
       }
     };
 
-    if (location.pathname.indexOf("login") < -1 || sessionStorage.getItem("accessToken")) fetchVersionInfo();
+    if (
+      location.pathname.indexOf("login") < -1 ||
+      sessionStorage.getItem("accessToken")
+    )
+      fetchVersionInfo();
   }, []);
 
   return (
-    <div className="app">
+    <div className="app-content">
       <Routes>
         <Route path="/" element={<Navigate to="/en/app" replace />} />
         <Route path="/:lng" element={<LanguageRedirect />} />
@@ -118,7 +133,10 @@ function App() {
   console.log(config);
   return (
     <Router>
-      <AppContent config={config} />
+      <div className="app">
+        <TopBar />
+        <AppContent config={config} />
+      </div>
     </Router>
   );
 }

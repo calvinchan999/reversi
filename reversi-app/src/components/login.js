@@ -1,10 +1,12 @@
 import "./login.css";
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useTranslation } from "react-i18next";
 import { GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 import { useSelector } from "react-redux";
 import axios from "axios";
+import store from '../redux/store';
+import { setUser } from '../redux/actions';
 
 function Login() {
   const { t } = useTranslation();
@@ -23,10 +25,22 @@ function Login() {
 
     const { token } = response.data;
     sessionStorage.setItem("accessToken", token);
+    store.dispatch(setUser(response.data))
   };
 
   const handleGoogleLoginError = () => {
     console.log("Google Login Failed");
+  };
+
+  const handleAnonymousLogin = async () => {
+    const response = await axios.post(
+      `${config.SERVER_URL}/api/auth/anonymous`,
+      ``
+    );
+
+    const { token } = response.data;
+    sessionStorage.setItem("accessToken", token);
+    store.dispatch(setUser(response.data))
   };
 
   return (
@@ -40,7 +54,9 @@ function Login() {
               onError={handleGoogleLoginError}
             />
           </div>
-          <button className="btn-anonymous">{t("play_as_guest")}</button>
+          <button className="btn-anonymous" onClick={handleAnonymousLogin}>
+            {t("play_as_guest")}
+          </button>
         </div>
       </div>
     </div>
