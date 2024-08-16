@@ -220,45 +220,49 @@ function Game() {
 
   return (
     <div className="app">
-      <h1>{t("reversi")}</h1>
+      {/* <h1>{t("reversi")}</h1> */}
       {!gameStarted && !gameOver ? (
         <div className="setup-container">
-          <h2>Available Rooms</h2>
-          <ul className="room-list">
-            {rooms?.map((room, i) => (
-              <li key={i} className="room-item">
-                <span>Room ID: {room.roomId}</span>
-                <span>Players: {room.totalPlayers} /2</span>
-                <button
-                  onClick={() => handleJoinRoom(room.id)}
-                  disabled={room.totalPlayers === 2}
-                >
-                  Join Room
-                </button>
-              </li>
-            ))}
-          </ul>
-          <h2>Or Create a New Room</h2>
-          <form onSubmit={handleJoinRoom}>
-            <input
-              type="text"
-              value={roomId}
-              onChange={(e) => setRoomId(e.target.value)}
-              placeholder="Enter new room ID"
-              disabled={isJoining}
-            />
-            <select
-              value={gameMode}
-              onChange={(e) => setGameMode(e.target.value)}
-              disabled={isJoining}
-            >
-              <option value="human">Human vs Human</option>
-              <option value="ai">Human vs AI</option>
-            </select>
-            <button type="submit" disabled={isJoining}>
-              Create and Join Room
-            </button>
-          </form>
+          <div className="room-list-container">
+            <h2>Available Rooms</h2>
+            <ul className="room-list">
+              {rooms?.map((room, i) => (
+                <li key={i} className="room-item">
+                  <span>Room ID: {room.roomId}</span>
+                  <span>Players: {room.totalPlayers} /2</span>
+                  <button
+                    onClick={() => handleJoinRoom(room.id)}
+                    disabled={room.totalPlayers === 2}
+                  >
+                    Join Room
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="create-room-container">
+            <h2>Create a New Room</h2>
+            <form onSubmit={handleJoinRoom}>
+              <input
+                type="text"
+                value={roomId}
+                onChange={(e) => setRoomId(e.target.value)}
+                placeholder="Enter new room ID"
+                disabled={isJoining}
+              />
+              <select
+                value={gameMode}
+                onChange={(e) => setGameMode(e.target.value)}
+                disabled={isJoining}
+              >
+                <option value="human">Human vs Human</option>
+                <option value="ai">Human vs AI</option>
+              </select>
+              <button type="submit" disabled={isJoining}>
+                Create and Join Room
+              </button>
+            </form>
+          </div>
         </div>
       ) : (
         <div className="game-container">

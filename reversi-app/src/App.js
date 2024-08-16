@@ -133,7 +133,7 @@ function App() {
   console.log(config);
   return (
     <Router>
-      <div className="app">
+      <div className="app min-h-screen">
         <TopBar />
         <AppContent config={config} />
       </div>
