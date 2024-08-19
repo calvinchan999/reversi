@@ -33,10 +33,14 @@ function isValidMove(board, player, index) {
     let currentIndex = index + direction;
     let flipped = false;
 
+    if (!isValidIndex(currentIndex) || board[currentIndex] !== opponent) {
+      return false;
+    }
+
     while (isValidIndex(currentIndex)) {
       // console.log(`currentIndex: ${currentIndex} board[currentIndex]: ${board[currentIndex]} player:${player} opponent:${opponent}`);
       if (board[currentIndex] === null) break;
-      if (board[currentIndex] === player) return flipped;
+      // if (board[currentIndex] === player) return flipped;
       if (board[currentIndex] === opponent) {
         // console.log(
         //   `currentIndex: ${currentIndex} board[currentIndex]: ${board[currentIndex]} player:${player} opponent:${opponent}`
