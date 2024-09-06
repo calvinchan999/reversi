@@ -19,9 +19,10 @@ function createGame() {
 }
 
 function isValidIndex(index) {
-  const row = Math.floor(index / 8);
-  const col = index % 8;
-  return row >= 0 && row < 8 && col >= 0 && col < 8;
+  // const row = Math.floor(index / 8);
+  // const col = index % 8;
+  // return row >= 0 && row < 8 && col >= 0 && col < 8;
+  return index >= 0 && index < BOARD_SIZE;
 }
 
 function isValidMove(board, player, index) {
@@ -31,23 +32,46 @@ function isValidMove(board, player, index) {
 
   return directions.some((direction) => {
     let currentIndex = index + direction;
-    let flipped = false;
+    let hasOpponent = false;
 
-    while (isValidIndex(currentIndex)) {
-      // console.log(`currentIndex: ${currentIndex} board[currentIndex]: ${board[currentIndex]} player:${player} opponent:${opponent}`);
-      if (board[currentIndex] === null) break;
-      if (board[currentIndex] === player) return flipped;
+    while (isValidIndex(currentIndex) && isInSameDirection(index, currentIndex, direction)) {
+      if (board[currentIndex] === null) return false;
       if (board[currentIndex] === opponent) {
-        // console.log(
-        //   `currentIndex: ${currentIndex} board[currentIndex]: ${board[currentIndex]} player:${player} opponent:${opponent}`
-        // );
-        flipped = true;
+        hasOpponent = true;
         currentIndex += direction;
+      } else if (board[currentIndex] === player) {
+        return hasOpponent;
       }
     }
 
     return false;
   });
+}
+
+function isInSameDirection(start, current, direction) {
+  const startRow = Math.floor(start / 8);
+  const startCol = start % 8;
+  const currentRow = Math.floor(current / 8);
+  const currentCol = current % 8;
+
+  switch (direction) {
+    case -9:
+    case 7:
+      return currentCol < startCol && currentRow < startRow; // up-left diagonal
+    case -7:
+    case 9:
+      return currentCol > startCol && currentRow > startRow; // down-right diagonal
+    case -8:
+      return currentCol === startCol && currentRow < startRow; // up
+    case 8:
+      return currentCol === startCol && currentRow > startRow; // down
+    case -1:
+      return currentRow === startRow && currentCol < startCol; // left
+    case 1:
+      return currentRow === startRow && currentCol > startCol; // right
+    default:
+      return false;
+  }
 }
 
 function getValidMoves(board, player) {
