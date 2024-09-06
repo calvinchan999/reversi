@@ -8,13 +8,6 @@
 
 
 .app {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  font-family: Arial, sans-serif;
-  padding: 20px;
-  box-sizing: border-box;
-  min-height: 100vh;
   background-color: var(--background-color);
 }
 
@@ -47,6 +40,43 @@
   padding: 20px;
   background-color: var(--background-color);
   border-radius: 8px;
+}
+
+.create-room-container {
+  position: absolute;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  background-color: var(--background-color);
+  border-radius: 8px;
+  width: 100%;
+}
+
+.create-room-container h2 {
+  margin-bottom: 15px;
+}
+
+.create-room-container form {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+}
+
+
+.create-room-container input,
+.create-room-container select {
+  flex: 3;  /* Takes up more space */
+  padding: 10px;
+  font-size: 16px;
+}
+
+.create-room-container button {
+  flex: 1;  /* Takes up less space */
+  padding: 10px;
+  font-size: 16px;
+  white-space: nowrap;
 }
 
 .room-list-container {

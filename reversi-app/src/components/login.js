@@ -44,7 +44,7 @@ function Login() {
   };
 
   return (
-    <div className="app bg-gray-50">
+    <div className=" flex flex-col items-center justify-center h-full">
       <div className="login-container">
         <h2 className="text-2xl font-bold mb-6 text-gray-800">{t("login")}</h2>
         <div className="login-options">

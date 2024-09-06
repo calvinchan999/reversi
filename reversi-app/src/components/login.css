@@ -1,13 +1,13 @@
-.app {
+/* .app {
   display: flex;
   flex-direction: column;
   align-items: center;
   font-family: Arial, sans-serif;
   padding: 20px;
-  /* max-width: 100vw; */
   box-sizing: border-box;
   justify-content: center;
-}
+} */
+
 
 .login-container {
   background-color: white;

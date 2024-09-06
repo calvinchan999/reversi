@@ -219,7 +219,7 @@ function Game() {
   };
 
   return (
-    <div className="app">
+    <div className="app flex flex-col items-center font-sans p-5 box-border justify-center h-full">
       {/* <h1>{t("reversi")}</h1> */}
       {!gameStarted && !gameOver ? (
         <div className="setup-container">
@@ -241,7 +241,6 @@ function Game() {
             </ul>
           </div>
           <div className="create-room-container">
-            <h2>Create a New Room</h2>
             <form onSubmit={handleJoinRoom}>
               <input
                 type="text"

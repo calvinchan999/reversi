@@ -9,7 +9,6 @@ html, body, #root {
   flex-direction: column;
   font-family: Arial, sans-serif;
   box-sizing: border-box;
-  min-height: 100vh;
 }
 
 .app-content {
